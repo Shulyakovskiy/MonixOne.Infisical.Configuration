@@ -183,6 +183,102 @@ public sealed class InfisicalConfigurationExtensionsTests
         options.RefreshIntervalSecondsEnvironmentVariable = RefreshIntervalVariable;
     }
 
+    [Fact]
+    public void CreateOptions_ExplicitInterval_OverridesSectionSecondsAndInvalidEnvironment()
+    {
+        using var environment = new EnvironmentVariableScope((RefreshIntervalVariable, "invalid"));
+        var configuration = new ConfigurationManager { ["Infisical:RefreshIntervalSeconds"] = "86400" };
+
+        var options = InfisicalConfigurationExtensions.CreateOptions(configuration, options =>
+        {
+            ConfigureEnvironmentVariableNames(options);
+            options.RefreshInterval = TimeSpan.FromHours(1);
+        });
+        options.ApplyEnvironmentDefaults();
+
+        options.RefreshInterval.ShouldBe(TimeSpan.FromHours(1));
+        options.RefreshIntervalSeconds.ShouldBeNull();
+    }
+
+    [Fact]
+    public void CreateOptions_ExplicitSeconds_OverrideSectionInterval()
+    {
+        var configuration = new ConfigurationManager { ["Infisical:RefreshInterval"] = "1.00:00:00" };
+
+        var options = InfisicalConfigurationExtensions.CreateOptions(configuration, options =>
+            options.RefreshIntervalSeconds = 3600);
+        options.ApplyEnvironmentDefaults();
+
+        options.RefreshInterval.ShouldBe(TimeSpan.FromHours(1));
+    }
+
+    [Fact]
+    public void CreateOptions_SectionSeconds_TakePriorityOverEnvironment()
+    {
+        using var environment = new EnvironmentVariableScope((RefreshIntervalVariable, "86400"));
+        var configuration = new ConfigurationManager { ["Infisical:RefreshIntervalSeconds"] = "3600" };
+        var options = InfisicalConfigurationExtensions.CreateOptions(configuration, ConfigureEnvironmentVariableNames);
+
+        options.ApplyEnvironmentDefaults();
+
+        options.RefreshInterval.ShouldBe(TimeSpan.FromHours(1));
+    }
+
+    [Fact]
+    public void CreateOptions_MissingInterval_DefaultsToOneHour_AndEnvironmentCanOverride()
+    {
+        using var environment = new EnvironmentVariableScope((RefreshIntervalVariable, null));
+        var configuration = new ConfigurationManager();
+        var defaults = InfisicalConfigurationExtensions.CreateOptions(configuration, ConfigureEnvironmentVariableNames);
+        defaults.ApplyEnvironmentDefaults();
+        defaults.RefreshInterval.ShouldBe(TimeSpan.FromHours(1));
+        Environment.SetEnvironmentVariable(RefreshIntervalVariable, "7200");
+
+        var configured = InfisicalConfigurationExtensions.CreateOptions(configuration, ConfigureEnvironmentVariableNames);
+        configured.ApplyEnvironmentDefaults();
+
+        configured.RefreshInterval.ShouldBe(TimeSpan.FromHours(2));
+    }
+
+    [Fact]
+    public void CreateOptions_ExplicitRecursiveFalse_IsNotOverriddenByEnvironment()
+    {
+        using var environment = new EnvironmentVariableScope((RecursiveVariable, "true"));
+        var configuration = new ConfigurationManager { ["Infisical:Recursive"] = "false" };
+        var sectionOptions = InfisicalConfigurationExtensions.CreateOptions(configuration);
+        sectionOptions.ApplyEnvironmentDefaults();
+        sectionOptions.Recursive.ShouldBeFalse();
+
+        var delegateOptions = InfisicalConfigurationExtensions.CreateOptions(new ConfigurationManager(),
+            options => options.Recursive = false);
+        delegateOptions.ApplyEnvironmentDefaults();
+        delegateOptions.Recursive.ShouldBeFalse();
+        var environmentOptions = InfisicalConfigurationExtensions.CreateOptions(new ConfigurationManager());
+        environmentOptions.ApplyEnvironmentDefaults();
+        environmentOptions.Recursive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_IntervalTooLargeForPeriodicTimer_IsRejected()
+    {
+        var options = FakeInfisicalHandler.Options();
+        options.RefreshInterval = TimeSpan.FromDays(50);
+
+        Should.Throw<InvalidOperationException>(options.Validate).Message.ShouldContain("refresh interval");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(4294967295)]
+    public void Validate_InvalidTimeout_IsRejected(long milliseconds)
+    {
+        var options = FakeInfisicalHandler.Options();
+        options.RefreshTimeout = TimeSpan.FromMilliseconds(milliseconds);
+
+        Should.Throw<InvalidOperationException>(options.Validate).Message.ShouldContain("refresh timeout");
+    }
+
     /// <summary>
     /// Restores process-level variables after each public configuration API test.
     /// </summary>

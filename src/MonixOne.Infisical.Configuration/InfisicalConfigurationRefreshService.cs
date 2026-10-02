@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace MonixOne.Infisical.Configuration;
 
 internal sealed class InfisicalConfigurationRefreshService(
-   InfisicalConfigurationProvider provider,
+    InfisicalConfigurationProvider provider,
     InfisicalConfigurationOptions options,
     ILogger<InfisicalConfigurationRefreshService> logger) : BackgroundService
 {

@@ -10,6 +10,12 @@ public sealed class InfisicalConfigurationOptions
 {
     public const string ConfigurationSectionName = "Infisical";
 
+    private TimeSpan _refreshInterval = TimeSpan.FromHours(1);
+    private long? _refreshIntervalSeconds;
+    private bool _refreshIntervalConfigured;
+    private bool _recursive;
+    private bool _recursiveConfigured;
+
     /// <summary>
     /// Enables loading Infisical secrets and registering background refresh.
     /// When disabled, AddInfisical does not validate Infisical settings or
@@ -29,7 +35,15 @@ public sealed class InfisicalConfigurationOptions
 
     public string? Url { get; set; }
 
-    public bool Recursive { get; set; }
+    public bool Recursive
+    {
+        get => _recursive;
+        set
+        {
+            _recursive = value;
+            _recursiveConfigured = true;
+        }
+    }
 
     public bool ExpandSecretReferences { get; set; } = true;
 
@@ -39,15 +53,41 @@ public sealed class InfisicalConfigurationOptions
     public bool SetProcessEnvironment { get; set; } = true;
 
     /// <summary>
-    /// Background configuration refresh interval. Defaults to one day.
+    /// Background configuration refresh interval. Defaults to one hour.
     /// </summary>
-    public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromDays(1);
+    public TimeSpan RefreshInterval
+    {
+        get => _refreshInterval;
+        set
+        {
+            _refreshInterval = value;
+            _refreshIntervalSeconds = null;
+            _refreshIntervalConfigured = true;
+        }
+    }
 
     /// <summary>
     /// Refresh interval in seconds for binding from the <c>Infisical</c>
     /// configuration section.
     /// </summary>
-    public long? RefreshIntervalSeconds { get; set; }
+    public long? RefreshIntervalSeconds
+    {
+        get => _refreshIntervalSeconds;
+        set
+        {
+            _refreshIntervalSeconds = value;
+            if (value is not null)
+            {
+                _refreshIntervalConfigured = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maximum duration of a refresh, including login, HTTP retries and response reading.
+    /// Defaults to 30 seconds.
+    /// </summary>
+    public TimeSpan RefreshTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     public string ClientIdEnvironmentVariable { get; set; } = "INFISICAL_CLIENT_ID";
 
@@ -75,12 +115,13 @@ public sealed class InfisicalConfigurationOptions
         SecretPath = ValueOrCurrent(SecretPath, SecretPathEnvironmentVariable);
         Url = ValueOrCurrentNullable(Url, UrlEnvironmentVariable);
 
-        if (bool.TryParse(Environment.GetEnvironmentVariable(RecursiveEnvironmentVariable), out var recursive))
+        if (!_recursiveConfigured
+            && bool.TryParse(Environment.GetEnvironmentVariable(RecursiveEnvironmentVariable), out var recursive))
         {
-            Recursive = recursive;
+            _recursive = recursive;
         }
 
-        if (RefreshIntervalSeconds is null)
+        if (!_refreshIntervalConfigured)
         {
             var refreshIntervalSeconds = Environment.GetEnvironmentVariable(
                 RefreshIntervalSecondsEnvironmentVariable);
@@ -111,7 +152,7 @@ public sealed class InfisicalConfigurationOptions
                     $"{ConfigurationSectionName}:RefreshIntervalSeconds must be a positive integer number of seconds.");
             }
 
-            RefreshInterval = TimeSpan.FromSeconds(seconds);
+            _refreshInterval = TimeSpan.FromSeconds(seconds);
         }
     }
 
@@ -139,9 +180,17 @@ public sealed class InfisicalConfigurationOptions
             SecretPath = "/";
         }
 
-        if (RefreshInterval <= TimeSpan.Zero)
+        var maximumTimerPeriod = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+        if (RefreshInterval < TimeSpan.FromMilliseconds(1) || RefreshInterval > maximumTimerPeriod)
         {
-            throw new InvalidOperationException("Infisical refresh interval must be positive.");
+            throw new InvalidOperationException(
+                "Infisical refresh interval must be positive and between 1 and 4294967294 milliseconds.");
+        }
+
+        if (RefreshTimeout < TimeSpan.FromMilliseconds(1) || RefreshTimeout > maximumTimerPeriod)
+        {
+            throw new InvalidOperationException(
+                "Infisical refresh timeout must be between 1 and 4294967294 milliseconds.");
         }
     }
 
