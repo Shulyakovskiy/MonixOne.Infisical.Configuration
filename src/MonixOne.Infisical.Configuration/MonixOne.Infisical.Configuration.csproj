@@ -14,14 +14,10 @@
     <Title>MonixOne.Infisical.Configuration</Title>
     <Authors>Shulyakovsky.E</Authors>
     <Copyright>MonixOne</Copyright>
-    <Version>1.1.3</Version>
+    <Version>1.1.4</Version>
     <PackageProjectUrl>https://github.com/Shulyakovskiy/SEA.Infisical.Configuration</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Shulyakovskiy/SEA.Infisical.Configuration</RepositoryUrl>
   </PropertyGroup>
-
-  <ItemGroup>
-      <PackageReference Include="Infisical.Sdk" />
-  </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
