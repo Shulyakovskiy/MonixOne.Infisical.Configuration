@@ -575,3 +575,24 @@ appsettings.Development.json
 
 /src/API/Features/Auth/Query/Old/
 /src/API/Features/Auth/Commands/Old/
+
+# Operating system metadata (at any directory level)
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble/
+.LSOverride
+.Spotlight-V100/
+.Trashes/
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# Editor swap files
+*.swp
+*.swo
+
+# Local environment overrides; keep distributable templates
+.env.*
+!.env.example
+!.env.sample
